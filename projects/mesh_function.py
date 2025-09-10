@@ -1,6 +1,6 @@
 import numpy as np
 from collections.abc import Callable
-import math
+
 
 def mesh_function(f: Callable[[float], float], t: np.ndarray) -> np.ndarray:
     y=np.array([f(time) for time in t])
