@@ -43,7 +43,7 @@ class Wave1D:
         self.un = np.zeros(N + 1)
         self.unm1 = np.zeros(N + 1)
 
-    def D2(self, bc: int) -> sparse.spmatrix:
+    def D2(self, bc: int | dict) -> sparse.spmatrix:
         """Return second order differentiation matrix
 
         Paramters
@@ -56,12 +56,37 @@ class Wave1D:
         The returned matrix is not divided by dx**2
         """
         D = sparse.diags([1, -2, 1], [-1, 0, 1], (self.N + 1, self.N + 1), "lil")
-        if bc == 1:  # Neumann condition is baked into stencil
-            raise NotImplementedError
 
-        elif bc == 3:  # periodic (Note u[0] = u[-1])
-            raise NotImplementedError
+      
+        if isinstance(bc, dict):
+            rightBC = bc("right")
+            leftBC = bc("left")
 
+            if leftBC == 1:  # Neumann condition is baked into stencil
+                D[0, 0] = -2
+                D[0, 1] = 2
+            elif leftBC == 0:  # Dirichlet condition
+                D[0, :] = 0
+        
+            if rightBC == 1:  # Neumann condition is baked into stencil
+                D[-1, -1] = 2
+                D[-1, -2] = -2
+            elif rightBC == 0:  # Dirichlet condition
+                D[-1, :] = 0    
+        
+        elif isinstance(bc, int):
+            if bc == 1:  # Neumann condition is baked into stencil
+                D[-1, -1] = 2
+                D[-1, -2] = -2
+            elif bc == 0:  # Dirichlet condition
+                D[0, :] = 0
+                D[-1, :] = 0
+            elif bc == 3:  # periodic (Note u[0] = u[-1])
+                D[0, 0] = -2
+                D[0, 1] = 1
+                D[0, -2] = 1
+                D[-1, -1] = -2
+                D[-1, -2] = 1
         return D
 
     def apply_bcs(self, bc: int, u: np.ndarray | None = None):
@@ -82,6 +107,7 @@ class Wave1D:
         """
         u = u if u is not None else self.unp1
         if bc == 0:  # Dirichlet condition
+            pass
             u[0] = 0
             u[-1] = 0
 
@@ -89,6 +115,8 @@ class Wave1D:
             pass
 
         elif bc == 2:  # Open boundary
+            u[0] = 2(1 - self.cfl) * un - (1 - self.cfl) / (1 + self.cfl) * u[2]
+            u[-1] = 2(1 - self.cfl) / (1 + self.cfl) * u[-2] - (1 - self.cfl) / (1 + self.cfl) * u[-3]  
             raise NotImplementedError
 
         elif bc == 3:
@@ -157,7 +185,7 @@ class Wave1D:
 
         for n in range(2, Nt + 1):
             self.unp1[:] = 2 * self.un - self.unm1 + C**2 * (D @ self.un)
-            self.apply_bcs(bc)
+            self.apply_bcs(bc, self.unp1)
             self.unm1[:] = self.un
             self.un[:] = self.unp1
             if n % save_step == 0:  # save every save_step timestep
