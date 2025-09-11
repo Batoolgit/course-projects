@@ -3,6 +3,7 @@ import sympy as sp
 from scipy import sparse
 import matplotlib.pyplot as plt
 from numbers import Number
+from typing import Union
 
 x, t, c, L = sp.symbols("x,t,c,L")
 
@@ -43,7 +44,7 @@ class Wave1D:
         self.un = np.zeros(N + 1)
         self.unm1 = np.zeros(N + 1)
 
-    def D2(self, bc: int | dict) -> sparse.spmatrix:
+    def D2(self, bc) -> sparse.spmatrix:
         """Return second order differentiation matrix
 
         Paramters
@@ -76,8 +77,10 @@ class Wave1D:
         
         elif isinstance(bc, int):
             if bc == 1:  # Neumann condition is baked into stencil
-                D[-1, -1] = 2
-                D[-1, -2] = -2
+                D[0, 0] = -2
+                D[0, 1] = 2
+                D[-1, -1] = -2
+                D[-1, -2] = 2
             elif bc == 0:  # Dirichlet condition
                 D[0, :] = 0
                 D[-1, :] = 0
@@ -89,7 +92,7 @@ class Wave1D:
                 D[-1, -2] = 1
         return D
 
-    def apply_bcs(self, bc: int, u: np.ndarray | None = None):
+    def apply_bcs(self, bc: int, u: Union[np.ndarray, None] = None):
         """Apply boundary conditions to solution vector
 
         Parameters
@@ -115,8 +118,8 @@ class Wave1D:
             pass
 
         elif bc == 2:  # Open boundary
-            u[0] = 2(1 - self.cfl) * un - (1 - self.cfl) / (1 + self.cfl) * u[2]
-            u[-1] = 2(1 - self.cfl) / (1 + self.cfl) * u[-2] - (1 - self.cfl) / (1 + self.cfl) * u[-3]  
+            #u[0] = 2(1 - self.cfl) * un - (1 - self.cfl) / (1 + self.cfl) * u[2]
+            #u[-1] = 2(1 - self.cfl) / (1 + self.cfl) * u[-2] - (1 - self.cfl) / (1 + self.cfl) * u[-3]  
             raise NotImplementedError
 
         elif bc == 3:
@@ -132,7 +135,7 @@ class Wave1D:
     def __call__(
         self,
         Nt: int,
-        cfl: Number | None = None,
+        cfl: Union[Number, None] = None,
         bc: int = 0,
         ic: int = 0,
         save_step: int = 100,
@@ -250,8 +253,8 @@ def test_pulse_bcs():
 
 
 if __name__ == "__main__":
-    # sol = Wave1D(100, cfl=1, L0=2, c0=1)
-    # data = sol(100, bc=3, save_step=1, ic=1)
-    # sol.animation(data)
+    sol = Wave1D(100, cfl=1, L0=2, c0=1)
+    data = sol(100, bc=1, save_step=1, ic=1)
+    sol.animation(data)
     test_pulse_bcs()
     # data = sol(200, bc=2, ic=0, save_step=100)
