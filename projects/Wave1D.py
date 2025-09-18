@@ -58,39 +58,50 @@ class Wave1D:
         """
         D = sparse.diags([1, -2, 1], [-1, 0, 1], (self.N + 1, self.N + 1), "lil")
 
-      
-        if isinstance(bc, dict):
-            rightBC = bc("right")
-            leftBC = bc("left")
+        if bc == 1:  # Neumann condition is baked into stencil
+            D[0, :4] = -2, 2, 0, 0
+            D[-1, -4:] = 0, 0, 2, -2
 
-            if leftBC == 1:  # Neumann condition is baked into stencil
-                D[0, 0] = -2
-                D[0, 1] = 2
-            elif leftBC == 0:  # Dirichlet condition
-                D[0, :] = 0
+        elif bc == 3:  # periodic (Note u[0] = u[-1])
+            D[0, -2] = 1
+
+        #det under fungerte ikke, hvorfor ikke
+        # if isinstance(bc, dict):
+        #     rightBC = bc("right")
+        #     leftBC = bc("left")
+
+        #     if leftBC == 1:  # Neumann condition is baked into stencil
+        #         D[0, 0] = -2
+        #         D[0, 1] = 2
+        #     elif leftBC == 0:  # Dirichlet condition
+        #         D[0, :] = 0
         
-            if rightBC == 1:  # Neumann condition is baked into stencil
-                D[-1, -1] = 2
-                D[-1, -2] = -2
-            elif rightBC == 0:  # Dirichlet condition
-                D[-1, :] = 0    
+        #     if rightBC == 1:  # Neumann condition is baked into stencil
+        #         D[-1, -1] = 2
+        #         D[-1, -2] = -2
+        #     elif rightBC == 0:  # Dirichlet condition
+        #         D[-1, :] = 0    
         
-        elif isinstance(bc, int):
-            if bc == 1:  # Neumann condition is baked into stencil
-                D[0, 0] = -2
-                D[0, 1] = 2
-                D[-1, -1] = -2
-                D[-1, -2] = 2
-            elif bc == 0:  # Dirichlet condition
-                D[0, :] = 0
-                D[-1, :] = 0
-            elif bc == 3:  # periodic (Note u[0] = u[-1])
-                D[0, 0] = -2
-                D[0, 1] = 1
-                D[0, -2] = 1
-                D[-1, -1] = -2
-                D[-1, -2] = 1
+        # elif isinstance(bc, int):
+        #     if bc == 1:  # Neumann condition is baked into stencil
+        #         D[0, 0] = -2
+        #         D[0, 1] = 2
+        #         D[-1, -1] = -2
+        #         D[-1, -2] = 2
+        #     elif bc == 0:  # Dirichlet condition
+        #         D[0, :] = 0
+        #         D[-1, :] = 0
+        #     elif bc == 3:  # periodic (Note u[0] = u[-1])
+        #         D[0, -2] = 1
+        #         #D[0, 0] = -2
+        #         #D[0, 1] = 1
+        #         #D[0, -2] = 1
+        #         #D[-1, -1] = -2
+        #         #D[-1, -2] = 1
         return D
+
+
+
 
     def apply_bcs(self, bc: int, u: Union[np.ndarray, None] = None):
         """Apply boundary conditions to solution vector
@@ -110,7 +121,6 @@ class Wave1D:
         """
         u = u if u is not None else self.unp1
         if bc == 0:  # Dirichlet condition
-            pass
             u[0] = 0
             u[-1] = 0
 
@@ -118,13 +128,22 @@ class Wave1D:
             pass
 
         elif bc == 2:  # Open boundary
-            #u[0] = 2(1 - self.cfl) * un - (1 - self.cfl) / (1 + self.cfl) * u[2]
-            #u[-1] = 2(1 - self.cfl) / (1 + self.cfl) * u[-2] - (1 - self.cfl) / (1 + self.cfl) * u[-3]  
-            raise NotImplementedError
+            C = self.cfl
+            # self.unp1[0] = self.un[0] + C * (self.un[1]-self.un[0])
+            # self.unp1[-1] = self.un[-1] - C * (self.un[-1]-self.un[-2])
+            u[0] = (
+                2 * (1 - C) * self.un[0]
+                - (1 - C) / (1 + C) * self.unm1[0]
+                + 2 * C**2 / (1 + C) * self.un[1]
+            )
+            u[-1] = (
+                2 * (1 - C) * self.un[-1]
+                - (1 - C) / (1 + C) * self.unm1[-1]
+                + 2 * C**2 / (1 + C) * self.un[-2]
+            )
 
         elif bc == 3:
-            raise NotImplementedError
-
+            u[-1] = u[0]
         else:
             raise RuntimeError(f"Wrong bc = {bc}")
 
@@ -254,7 +273,7 @@ def test_pulse_bcs():
 
 if __name__ == "__main__":
     sol = Wave1D(100, cfl=1, L0=2, c0=1)
-    data = sol(100, bc=1, save_step=1, ic=1)
+    data = sol(100, bc=2, save_step=1, ic=1)
     sol.animation(data)
-    test_pulse_bcs()
+    #test_pulse_bcs()
     # data = sol(200, bc=2, ic=0, save_step=100)
